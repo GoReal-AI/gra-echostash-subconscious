@@ -22,6 +22,11 @@
       "import": "./dist/llm/anthropic.js",
       "require": "./dist/llm/anthropic.cjs"
     },
+    "./llm/google": {
+      "types": "./dist/llm/google.d.ts",
+      "import": "./dist/llm/google.js",
+      "require": "./dist/llm/google.cjs"
+    },
     "./storage/redis": {
       "types": "./dist/storage/redis.d.ts",
       "import": "./dist/storage/redis.js",
@@ -78,12 +83,16 @@
   },
   "peerDependencies": {
     "@anthropic-ai/sdk": ">=0.30.0",
+    "@google/generative-ai": ">=0.20.0",
     "chromadb": ">=1.0.0",
     "openai": ">=4.0.0",
     "redis": ">=4.0.0"
   },
   "peerDependenciesMeta": {
     "@anthropic-ai/sdk": {
+      "optional": true
+    },
+    "@google/generative-ai": {
       "optional": true
     },
     "chromadb": {
@@ -98,6 +107,7 @@
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
+    "@google/generative-ai": "^0.24.1",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "chromadb": "^3.4.0",

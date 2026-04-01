@@ -88,7 +88,9 @@ Default to "passthrough". Use "reshape" only when the context would actively mis
   ]);
 
   try {
-    return JSON.parse(response.content) as ClassifyResult;
+    // Some models (Gemini) wrap JSON in markdown code blocks
+    const raw = response.content.replace(/```(?:json)?\s*/g, '').replace(/```\s*/g, '').trim();
+    return JSON.parse(raw) as ClassifyResult;
   } catch {
     return { action: 'passthrough', reasoning: 'parse failed — defaulting to passthrough' };
   }
