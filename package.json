@@ -22,6 +22,16 @@
       "import": "./dist/llm/anthropic.js",
       "require": "./dist/llm/anthropic.cjs"
     },
+    "./storage/redis": {
+      "types": "./dist/storage/redis.d.ts",
+      "import": "./dist/storage/redis.js",
+      "require": "./dist/storage/redis.cjs"
+    },
+    "./storage/chroma": {
+      "types": "./dist/storage/chroma.d.ts",
+      "import": "./dist/storage/chroma.js",
+      "require": "./dist/storage/chroma.cjs"
+    },
     "./middleware": {
       "types": "./dist/middleware/index.d.ts",
       "import": "./dist/middleware/index.js",
@@ -68,13 +78,21 @@
   },
   "peerDependencies": {
     "@anthropic-ai/sdk": ">=0.30.0",
-    "openai": ">=4.0.0"
+    "chromadb": ">=1.0.0",
+    "openai": ">=4.0.0",
+    "redis": ">=4.0.0"
   },
   "peerDependenciesMeta": {
     "@anthropic-ai/sdk": {
       "optional": true
     },
+    "chromadb": {
+      "optional": true
+    },
     "openai": {
+      "optional": true
+    },
+    "redis": {
       "optional": true
     }
   },
@@ -82,10 +100,12 @@
     "@anthropic-ai/sdk": "^0.39.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
+    "chromadb": "^3.4.0",
     "eslint": "^9.0.0",
     "eslint-config-prettier": "^9.0.0",
     "openai": "^4.80.0",
     "prettier": "^3.0.0",
+    "redis": "^5.11.0",
     "tsup": "^8.0.0",
     "tsx": "^4.0.0",
     "typescript": "^5.5.0",
