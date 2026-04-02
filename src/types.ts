@@ -148,7 +148,7 @@ export interface SubconsciousConfig {
   kv: KVStore;
   llm: LLMAdapter;
   sessionId?: string;
-  /** Max tokens for the main agent's context window. Default: 8000 */
+  /** Max tokens for the main agent's context window. Default: 4000 */
   tokenBudget?: number;
   /** Always keep the last N messages uncompressed. Default: 10 */
   recentWindow?: number;

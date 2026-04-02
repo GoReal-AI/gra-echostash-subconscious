@@ -58,7 +58,7 @@ export class Subconscious {
       kv: config.kv,
       llm: config.llm,
       sessionId: config.sessionId ?? generateId(),
-      tokenBudget: config.tokenBudget ?? 8000,
+      tokenBudget: config.tokenBudget ?? 4000,
       recentWindow: config.recentWindow ?? 10,
     };
 
