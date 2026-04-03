@@ -206,7 +206,7 @@ export function enrich(message: Message, turn: number): EnrichedMessage {
     recalled: false,
     summarized: false,
     topic: '',
-    references: [],
+    references: message.replyTo ? [message.replyTo] : [],
     recallCount: 0,
   };
 

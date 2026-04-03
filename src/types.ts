@@ -22,6 +22,8 @@ export interface Message {
   source?: MessageSource;
   /** Developer can pin a message so it's never compressed or removed. */
   pinned?: boolean;
+  /** ID of the message this is a response/reaction to (links tool results to user messages) */
+  replyTo?: string;
 }
 
 // ---------------------------------------------------------------------------

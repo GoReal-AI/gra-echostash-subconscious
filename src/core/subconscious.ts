@@ -49,6 +49,8 @@ export class Subconscious {
   private readonly onStatus: StatusCallback;
   private readonly background: BackgroundQueue;
   private context: EnrichedMessage[] = [];
+  /** ID of the last user message — used to auto-link tool results */
+  private lastUserMessageId: string | null = null;
   private summary = '';
   private turn = 0;
 
@@ -84,7 +86,14 @@ export class Subconscious {
     const actions: PrepareAction[] = [];
 
     // --- SCRIPTED: enrich the message (tokens, priority, source) ---
-    const newMessage = enrich(rawMessage, this.turn);
+    // Auto-link non-user messages to the last user message
+    const messageToEnrich = { ...rawMessage };
+    if (rawMessage.role === 'user') {
+      this.lastUserMessageId = rawMessage.id;
+    } else if (!rawMessage.replyTo && this.lastUserMessageId) {
+      messageToEnrich.replyTo = this.lastUserMessageId;
+    }
+    const newMessage = enrich(messageToEnrich, this.turn);
     this.turn++;
 
     // --- SCRIPTED: remove expired messages from context ---
@@ -214,8 +223,15 @@ export class Subconscious {
    * Stores full version for recall. Decides context representation.
    */
   async ingest(rawResponse: Message): Promise<IngestResult> {
+    // Auto-link assistant responses to the last user message
+    const responseWithRef = {
+      ...rawResponse,
+      id: rawResponse.id || generateId(),
+      timestamp: rawResponse.timestamp || Date.now(),
+      replyTo: rawResponse.replyTo ?? this.lastUserMessageId ?? undefined,
+    };
     const message = enrich(
-      { ...rawResponse, id: rawResponse.id || generateId(), timestamp: rawResponse.timestamp || Date.now() },
+      responseWithRef,
       this.turn,
     );
     this.turn++;
