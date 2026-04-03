@@ -131,14 +131,14 @@ describe('computeRelevancy', () => {
     expect(highSim).toBeGreaterThan(lowSim);
   });
 
-  it('should boost recalled messages', () => {
+  it('should not boost recalled messages — relevancy is content-driven', () => {
     const neverRecalled = enriched('user', 'test', 10, { recallCount: 0 });
     const recalled = enriched('user', 'test', 10, { recallCount: 3 });
 
     const neverScore = computeRelevancy(neverRecalled, 0.5, 20);
     const recalledScore = computeRelevancy(recalled, 0.5, 20);
 
-    expect(recalledScore).toBeGreaterThan(neverScore);
+    expect(recalledScore).toBe(neverScore);
   });
 });
 

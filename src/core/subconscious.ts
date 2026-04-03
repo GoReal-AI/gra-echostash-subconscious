@@ -31,6 +31,7 @@ import {
 } from './engine.js';
 import type { EngineConfig } from './engine.js';
 import { BackgroundQueue } from './background.js';
+import { PromptLoader } from './prompts.js';
 import {
   deduplicate,
   enrich,
@@ -62,6 +63,7 @@ export class Subconscious {
       sessionId: config.sessionId ?? generateId(),
       tokenBudget: config.tokenBudget ?? 4000,
       recentWindow: config.recentWindow ?? 10,
+      prompts: new PromptLoader(config.echostash),
     };
 
     this.onStatus = config.onStatus ?? (() => {});
@@ -153,6 +155,13 @@ export class Subconscious {
         compressedCount = this.context.length;
         this.context = [...reshapeResult.messages, newMessage];
 
+        // Stash briefing in vector DB — the Sub can search past briefings
+        // to understand conversation history when classifying or recalling
+        this.background.enqueueAndProcess({
+          type: 'embed',
+          execute: () => stash(this.config, reshapeResult.briefing),
+        });
+
         actions.push({ type: 'reshape', detail: classification.reasoning });
         actions.push({ type: 'briefing', detail: reshapeResult.briefing.content });
         break;
@@ -191,9 +200,9 @@ export class Subconscious {
       },
     });
 
-    // Background: compress if over budget after recent window is excluded
+    // Background: compress if non-recent messages are piling up
     const nonRecent = this.context.length - this.config.recentWindow;
-    if (nonRecent > 20) {
+    if (nonRecent > 10) {
       this.background.enqueue({
         type: 'compress',
         execute: () => this.compressOldMessages(),

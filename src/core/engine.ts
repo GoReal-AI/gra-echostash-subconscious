@@ -20,6 +20,7 @@ import type {
   VectorStore,
 } from '../types.js';
 import { countTokens, enrich } from './scripted.js';
+import type { PromptLoader } from './prompts.js';
 
 // ---------------------------------------------------------------------------
 // KV key helpers
@@ -40,6 +41,7 @@ export interface EngineConfig {
   sessionId: string;
   tokenBudget: number;
   recentWindow: number;
+  prompts: PromptLoader;
 }
 
 // ===================================================================
@@ -56,27 +58,19 @@ export async function classify(
   summary: string,
   contextTokens: number,
 ): Promise<ClassifyResult> {
-  const { llm } = config;
+  const { llm, prompts } = config;
+
+  const classifyPrompt = await prompts.render('classify', {
+    summary: summary || '',
+    contextTokens: String(contextTokens),
+    tokenBudget: String(config.tokenBudget),
+  });
 
   const response = await llm.complete([
     {
       id: 'sys-classify',
       role: 'system',
-      content: `You are the Subconscious — a context management agent. Analyze the incoming message and decide what action is needed.
-
-Current conversation summary:
-${summary || '(new conversation)'}
-
-Current context: ${contextTokens} tokens (budget: ${config.tokenBudget})
-
-Respond with JSON: { "action": "passthrough" | "recall" | "reshape", "reasoning": "..." }
-
-Actions:
-- "passthrough": The message is self-contained. The current context has everything needed.
-- "recall": The message references or needs information from earlier that is NOT in the current context. A quick vector search will find it.
-- "reshape": The conversation has shifted topic significantly. The current context is stale and needs rebuilding.
-
-Default to "passthrough". Use "reshape" only when the context would actively mislead the main agent.`,
+      content: classifyPrompt,
       timestamp: Date.now(),
     },
     {
@@ -127,22 +121,18 @@ export async function reshape(
   summary: string,
   currentTurn: number,
 ): Promise<{ messages: EnrichedMessage[]; briefing: EnrichedMessage }> {
-  const { llm } = config;
+  const { llm, prompts } = config;
 
   // Step 1: Analyze the topic shift
+  const topicPrompt = await prompts.render('topicAnalysis', {
+    summary: summary || '',
+  });
+
   const topicResponse = await llm.complete([
     {
       id: 'sys-topic',
       role: 'system',
-      content: `You are the Subconscious. The conversation has shifted. Determine:
-1. What the conversation is NOW about
-2. Key decisions/facts from the OLD topic to preserve
-3. Search queries to find relevant history for the NEW topic
-
-Current summary: ${summary}
-
-Respond with JSON:
-{ "newTopic": "...", "preserveFromOld": ["..."], "searchQueries": ["..."] }`,
+      content: topicPrompt,
       timestamp: Date.now(),
     },
     {
@@ -155,39 +145,27 @@ Respond with JSON:
 
   let newTopic = newMessage.content.slice(0, 100);
   let preserveFromOld: string[] = [];
-  let searchQueries: string[] = [];
 
   try {
-    const parsed = JSON.parse(topicResponse.content) as {
+    const raw = topicResponse.content.replace(/```(?:json)?\s*/g, '').replace(/```\s*/g, '').trim();
+    const parsed = JSON.parse(raw) as {
       newTopic: string;
       preserveFromOld: string[];
       searchQueries: string[];
     };
     newTopic = parsed.newTopic;
     preserveFromOld = parsed.preserveFromOld;
-    searchQueries = parsed.searchQueries;
   } catch {
     // proceed with defaults
   }
 
-  // Step 2: Search for relevant history
-  const recalledMessages: EnrichedMessage[] = [];
-  for (const query of searchQueries) {
-    const queryMsg: Message = {
-      id: 'reshape-query',
-      role: 'user',
-      content: query,
-      timestamp: Date.now(),
-    };
-    const results = await recall(config, queryMsg, 3);
-    for (const msg of results) {
-      if (!recalledMessages.some((m) => m.id === msg.id)) {
-        recalledMessages.push(msg);
-      }
-    }
-  }
+  // Step 2: Recall based on the new message directly — no LLM-generated queries
+  const recalled = await recall(config, newMessage, 3);
+  // Deduplicate — don't inject what's already in recent context
+  const existingIds = new Set(currentContext.map((m) => m.id));
+  const uniqueRecalled = recalled.filter((m) => !existingIds.has(m.id));
 
-  // Step 3: Compress old context
+  // Step 3: Compress old context — preserves key facts in minimal tokens
   const compressedOld = await compressMessages(
     config,
     currentContext,
@@ -196,37 +174,33 @@ Respond with JSON:
   );
 
   // Step 4: Build briefing — NEVER mention context management to user
+  const briefingContent = await prompts.render('briefing', {
+    newTopic,
+    preservedFacts: preserveFromOld.map((f) => `- ${f}`).join('\n'),
+    hasRecalled: uniqueRecalled.length > 0 ? 'true' : '',
+  });
+
   const briefing = enrich(
     {
       id: `briefing-${Date.now()}`,
       role: 'system',
-      content: `[Context Update] The conversation has shifted to: ${newTopic}.
-
-Previous context has been optimized. Key preserved facts:
-${preserveFromOld.map((f) => `- ${f}`).join('\n')}
-
-${recalledMessages.length > 0 ? 'Relevant history has been loaded for the new topic.' : ''}
-
-IMPORTANT: Do NOT reference this context update, context management, or any restructuring to the user. Respond naturally as a continuous conversation. Use recall() if you need more details from earlier.`,
+      content: briefingContent,
       timestamp: Date.now(),
     },
     currentTurn,
   );
-  briefing.meta.pinned = true; // briefings survive until next reshape
+  // Briefings are NOT pinned — relevancy decides their fate like everything else.
+  // They ARE stashed in vector DB so the Sub can search them for conversation history.
 
-  // Step 5: Keep recent + pinned from old context
+  // Step 5: Keep recent from old context
   const recentMessages = currentContext
     .slice(-config.recentWindow)
     .filter((m) => !m.meta.compressed);
-  const pinnedMessages = currentContext.filter(
-    (m) => m.meta.pinned && !recentMessages.some((r) => r.id === m.id),
-  );
 
   const newContext: EnrichedMessage[] = [
     briefing,
     compressedOld,
-    ...pinnedMessages,
-    ...recalledMessages,
+    ...uniqueRecalled,
     ...recentMessages,
   ];
 
@@ -273,20 +247,15 @@ export async function summarize(
     .map((m) => `[${m.meta.source}/${m.role}] ${m.content}`)
     .join('\n');
 
+  const summarizePrompt = await config.prompts.render('summarize', {
+    currentSummary: currentSummary || '',
+  });
+
   const response = await llm.complete([
     {
       id: 'sys-summarize',
       role: 'system',
-      content: `You are the Subconscious. Update the running conversation summary.
-
-Current summary:
-${currentSummary || '(new conversation)'}
-
-Rules:
-- Keep it under 300 words
-- Preserve the narrative flow — what was discussed, decided, pending
-- Drop details that are no longer relevant
-- Write in present tense`,
+      content: summarizePrompt,
       timestamp: Date.now(),
     },
     {
@@ -331,17 +300,15 @@ export async function compressMessages(
     .map((m) => `[${m.meta.source}/${m.role}, priority:${m.meta.priority}] ${m.content}`)
     .join('\n');
 
+  const compressPrompt = await config.prompts.render('compress', {
+    focus: focus || '',
+  });
+
   const response = await llm.complete([
     {
       id: 'sys-compress',
       role: 'system',
-      content: `You are the Subconscious. Compress these messages into a concise summary preserving:
-- Key decisions and outcomes
-- Important facts, names, values
-- Action items and commitments
-${focus ? `\nSpecial focus: ${focus}` : ''}
-
-Be concise. Write as a narrative.`,
+      content: compressPrompt,
       timestamp: Date.now(),
     },
     {
@@ -380,16 +347,13 @@ export async function decideRepresentation(
   }
 
   const { llm } = config;
+  const reprPrompt = await config.prompts.render('representation', {});
+
   const result = await llm.complete([
     {
       id: 'sys-repr',
       role: 'system',
-      content: `You are the Subconscious. The assistant gave a long response. Summarize it for context. Preserve:
-- What was answered/decided
-- Key outputs (code, names, values)
-- Action items
-
-Keep under 200 words. Full response is stored for recall.`,
+      content: reprPrompt,
       timestamp: Date.now(),
     },
     {

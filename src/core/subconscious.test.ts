@@ -175,7 +175,7 @@ describe('Subconscious', () => {
     expect(result.totalTokens).toBe(enriched.meta.tokens);
   });
 
-  it('should respect pinned messages', async () => {
+  it('should allow pinned messages to be dropped by budget-trim like any other message', async () => {
     const sub = new Subconscious({
       vector: new MemoryVectorStore(),
       kv: new MemoryKVStore(),
@@ -192,10 +192,9 @@ describe('Subconscious', () => {
       await sub.prepare(msg('user', `Filler message number ${i} with some extra words to increase token count`));
     }
 
+    // Pinned messages are no longer protected — relevancy decides what stays
     const context = sub.getContext();
-    const pinned = context.find((m) => m.meta.pinned);
-    expect(pinned).toBeDefined();
-    expect(pinned!.content).toContain('IMPORTANT');
+    expect(context.length).toBeLessThanOrEqual(5);
   });
 
   it('should ingest responses with metadata', async () => {

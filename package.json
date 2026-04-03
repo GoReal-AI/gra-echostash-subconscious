@@ -120,5 +120,9 @@
     "tsx": "^4.0.0",
     "typescript": "^5.5.0",
     "vitest": "^2.0.0"
+  },
+  "dependencies": {
+    "@goreal-ai/echo-pdk": "^0.12.1",
+    "echostash": "^1.0.0"
   }
 }

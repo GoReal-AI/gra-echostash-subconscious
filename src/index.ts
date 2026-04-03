@@ -1,5 +1,7 @@
 export { Subconscious } from './core/subconscious.js';
 export { BackgroundQueue } from './core/background.js';
+export { PromptLoader } from './core/prompts.js';
+export type { EchostashPromptConfig } from './core/prompts.js';
 
 // Scripted utilities — useful for developers building custom integrations
 export {

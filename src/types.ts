@@ -158,6 +158,8 @@ export interface SubconsciousConfig {
   onStatus?: StatusCallback;
   /** Error handler for background tasks. Silent by default. */
   onBackgroundError?: (error: unknown, task: BackgroundTask) => void;
+  /** Echostash config — fetch prompts from Echostash instead of using defaults */
+  echostash?: { baseUrl: string; apiKey: string };
 }
 
 // ---------------------------------------------------------------------------

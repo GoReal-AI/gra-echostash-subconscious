@@ -4,7 +4,7 @@
  *
  * - Token counting
  * - Priority assignment (keyword-based)
- * - Relevancy scoring (cosine similarity + recency + priority + recall boost)
+ * - Relevancy scoring (semantic + recency + priority)
  * - Source inference
  * - Budget enforcement
  * - Deduplication
@@ -111,10 +111,9 @@ export function inferSource(message: Message): MessageSource {
  * These can be tuned — they're a starting point.
  */
 export const RELEVANCY_WEIGHTS = {
-  semantic: 0.4,
+  semantic: 0.5,
   recency: 0.3,
   priority: 0.2,
-  recallBoost: 0.1,
 } as const;
 
 /** Priority to numeric weight. */
@@ -134,13 +133,6 @@ function recencyScore(messageTurn: number, currentTurn: number): number {
   return Math.exp(-age / 20);
 }
 
-/** Recall boost — messages that have been recalled before are more important. */
-function recallBoost(recallCount: number): number {
-  if (recallCount === 0) return 0;
-  // Diminishing returns: 1 recall = 0.5, 2 = 0.75, 3+ = ~0.87
-  return 1 - 1 / (1 + recallCount);
-}
-
 /**
  * Compute relevancy score for a message.
  *
@@ -158,8 +150,7 @@ export function computeRelevancy(
   return (
     semanticSimilarity * w.semantic +
     recencyScore(message.meta.turn, currentTurn) * w.recency +
-    priorityWeight(message.meta.priority) * w.priority +
-    recallBoost(message.meta.recallCount) * w.recallBoost
+    priorityWeight(message.meta.priority) * w.priority
   );
 }
 
@@ -222,9 +213,8 @@ export function enrich(message: Message, turn: number): EnrichedMessage {
  *
  * Hard rules (scripted, non-negotiable):
  * 1. Current user message is NEVER removed
- * 2. Pinned messages are NEVER removed
- * 3. Recent window (last N messages) is kept intact
- * 4. Remaining messages are sorted by relevancy, lowest dropped first
+ * 2. Recent window (last N messages) is kept intact
+ * 3. Everything else sorted by relevancy, lowest dropped first
  *
  * Returns the trimmed context and the messages that were dropped.
  */
@@ -244,9 +234,8 @@ export function enforceTokenBudget(
 
   const protectedSet = new Set<number>();
   for (let i = 0; i < messages.length; i++) {
-    const msg = messages[i]!;
-    // Protect: current message (last), pinned, recent window
-    if (i === lastIndex || msg.meta.pinned || i >= recentStart) {
+    // Protect: current message (last), recent window
+    if (i === lastIndex || i >= recentStart) {
       protectedSet.add(i);
     }
   }
