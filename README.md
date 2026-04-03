@@ -209,7 +209,7 @@ const sub = new Subconscious({
   kv: KVStore,                  // required
   llm: LLMAdapter,             // required
   sessionId?: string,           // default: auto-generated
-  tokenBudget?: number,         // default: 8000
+  tokenBudget?: number,         // default: 4000
   recentWindow?: number,        // default: 10
   onStatus?: StatusCallback,    // optional
 });
@@ -257,8 +257,9 @@ npm run dev       # watch mode
 
 ## Roadmap
 
-- [ ] Storage adapters: Chroma, Redis, pgvector
-- [ ] LLM adapters: Anthropic (Haiku), OpenAI (GPT-4o-mini), Google (Gemini Flash)
+- [x] Storage adapters: Chroma, Redis (+ in-memory for dev)
+- [x] LLM adapters: Google Gemini, OpenAI, Anthropic
+- [ ] Storage adapters: pgvector, Qdrant, Pinecone
 - [ ] Framework middleware: LangChain, Vercel AI SDK, CrewAI
 - [ ] PDK template integration for customizable Subconscious behavior
 - [ ] Cross-session memory

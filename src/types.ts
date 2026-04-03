@@ -156,6 +156,8 @@ export interface SubconsciousConfig {
   recentWindow?: number;
   /** Status callback — shows the user what the Subconscious is doing */
   onStatus?: StatusCallback;
+  /** Error handler for background tasks. Silent by default. */
+  onBackgroundError?: (error: unknown, task: BackgroundTask) => void;
 }
 
 // ---------------------------------------------------------------------------

@@ -67,9 +67,7 @@ export class Subconscious {
     this.onStatus = config.onStatus ?? (() => {});
 
     this.background = new BackgroundQueue({
-      onError: (error) => {
-        console.error('[Subconscious] Background task failed:', error);
-      },
+      onError: config.onBackgroundError,
     });
   }
 
