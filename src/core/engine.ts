@@ -124,7 +124,7 @@ export async function reshape(
   const { llm, prompts } = config;
 
   // Step 1: Analyze the topic shift
-  const topicPrompt = await prompts.render('topicAnalysis', {
+  const topicPrompt = await prompts.render('reshape', {
     summary: summary || '',
   });
 
@@ -347,7 +347,7 @@ export async function decideRepresentation(
   }
 
   const { llm } = config;
-  const reprPrompt = await config.prompts.render('representation', {});
+  const reprPrompt = await config.prompts.render('represent', {});
 
   const result = await llm.complete([
     {
