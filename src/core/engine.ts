@@ -66,27 +66,28 @@ export async function classify(
     tokenBudget: String(config.tokenBudget),
   });
 
-  const response = await llm.complete([
-    {
-      id: 'sys-classify',
-      role: 'system',
-      content: classifyPrompt,
-      timestamp: Date.now(),
-    },
-    {
-      id: 'user-classify',
-      role: 'user',
-      content: `[${newMessage.meta.source}/${newMessage.role}] ${newMessage.content}`,
-      timestamp: Date.now(),
-    },
-  ]);
-
   try {
+    const response = await llm.complete([
+      {
+        id: 'sys-classify',
+        role: 'system',
+        content: classifyPrompt,
+        timestamp: Date.now(),
+      },
+      {
+        id: 'user-classify',
+        role: 'user',
+        content: `[${newMessage.meta.source}/${newMessage.role}] ${newMessage.content}`,
+        timestamp: Date.now(),
+      },
+    ]);
+
     // Some models (Gemini) wrap JSON in markdown code blocks
     const raw = response.content.replace(/```(?:json)?\s*/g, '').replace(/```\s*/g, '').trim();
     return JSON.parse(raw) as ClassifyResult;
   } catch {
-    return { action: 'passthrough', reasoning: 'parse failed — defaulting to passthrough' };
+    // Network error, rate limit, or parse failure — safe default
+    return { action: 'passthrough', reasoning: 'classify failed — defaulting to passthrough' };
   }
 }
 
